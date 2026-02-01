@@ -1,0 +1,251 @@
+{
+  "ruleEngine": {
+    "version": "1.0",
+    "sourceDocument": "Provided telecom troubleshooting notes",
+    "rules": [
+      {
+        "id": "R001",
+        "name": "S1 Connection Failure / Service Unavailable",
+        "description": "Detect S1 (EPC) connectivity problems causing service unavailable.",
+        "conditions": [
+          { "metric": "Alarm", "operator": "contains", "value": "Serviceunavailable" },
+          { "metric": "pmErabRelAbnormalEnbActTnFai", "operator": ">", "value": 0 }
+        ],
+        "actions": [
+          "Raise critical alarm",
+          "Verify S1 link and S1 config on eNodeB and EPC",
+          "Check transport (S1) packet loss and IP route",
+          "If persistent, escalate to EPC team and check SGW"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R002",
+        "name": "Cell Down (Auto or Manual)",
+        "description": "Detect cell down conditions reported automatically or manually.",
+        "conditions": [
+          { "metric": "pmCellDowntimeAuto", "operator": ">", "value": 0 },
+          { "metric": "pmCellDowntimeMan", "operator": ">", "value": 0 },
+          { "metric": "Alarm", "operator": "contains", "value": "Cell Down" }
+        ],
+        "actions": [
+          "Mark cell as down and stop scheduling traffic",
+          "Trigger eNB health checkup (baseband, RRU, power)",
+          "Check recent restarts, config changes",
+          "If auto-down, verify autopmCellDownLock and recent alarms"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R003",
+        "name": "High VSWR or Antenna Fault",
+        "description": "Detect antenna related faults that can impact coverage and UL performance.",
+        "conditions": [
+          { "metric": "Alarm", "operator": "contains", "value": "VswrOverThreshold" },
+          { "metric": "pmRadioRecInterferencePwr", "operator": ">", "value": 0 }
+        ],
+        "actions": [
+          "Raise hardware alarm and dispatch field engineer",
+          "Check connectors, TMAs, antenna ports and cables",
+          "Validate RF parameters (crsGain, pdschTypeBGain, confOutputPower)"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R004",
+        "name": "Packet Loss - Downlink (PDCP)",
+        "description": "Detect increased downlink PDCP packet discard/loss.",
+        "conditions": [
+          { "metric": "pmPdcpPktDiscDlPelr", "operator": ">", "value": "threshold_dl_pelr" },
+          { "metric": "pmPdcpPktDiscDlPelrUu", "operator": ">", "value": "threshold_uu_pelr" }
+        ],
+        "actions": [
+          "Investigate RLC retransmissions and poll timers",
+          "Check transport and backhaul packet loss (IP counters)",
+          "Validate MTU to avoid fragmentation (use >1360 bytes recommended)",
+          "Run Iperf/FTP tests to confirm throughput and packet loss"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R005",
+        "name": "High Latency - User Plane",
+        "description": "Detect excessive user plane latency (PDCP / UE processing / TTI impacts).",
+        "conditions": [
+          { "metric": "pmPdcpLatTimeDl", "operator": ">", "value": 10 },
+          { "metric": "pmPdcpLatPktTransDlUE", "operator": ">", "value": 5 }
+        ],
+        "actions": [
+          "Check HARQ retransmission rates and TTI utilization",
+          "Inspect eNodeB processing delay and CPU load",
+          "Verify transport latency and run Iperf tests",
+          "Tune scheduling and check UE category/subscription limits"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R006",
+        "name": "RRC/NAS Signalling Delay",
+        "description": "Detect long RRC or NAS setup times affecting attach and connection.",
+        "conditions": [
+          { "metric": "RRCSetupDelay", "operator": ">", "value": 20 },
+          { "metric": "NASSetupDelay", "operator": ">", "value": 30 }
+        ],
+        "actions": [
+          "Verify eNodeB and MME processing and parallel NAS handling",
+          "Check for excessive retransmissions and RACH delays",
+          "Review UE processing time distribution and UE category"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R007",
+        "name": "UL Interference and Low SINR",
+        "description": "Detect uplink interference impacting PUCCH/PUSCH.",
+        "conditions": [
+          { "metric": "pmRadioRecInterferencePwrPucch", "operator": ">", "value": "threshold" },
+          { "metric": "pmSinrPucchDistr", "operator": "<", "value": "threshold_sinr" },
+          { "metric": "pmSinrPuschDistr", "operator": "<", "value": "threshold_sinr" }
+        ],
+        "actions": [
+          "Enable power control tuning, IRC and UL FSS if available",
+          "Check for external interference sources (repeaters, broadcast, civil/military)",
+          "Inspect site cabling and passive components for leakage"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R008",
+        "name": "UL Modulation Degradation",
+        "description": "Detect drop in uplink higher-order modulation usage (e.g., 16QAM).",
+        "conditions": [
+          { "metric": "pmMacHarqUlSucc16qam", "operator": "<", "value": "threshold_mod_ratio" },
+          { "metric": "pmMacHarqUlSuccQpsk", "operator": ">", "value": "threshold_qpsk" }
+        ],
+        "actions": [
+          "Investigate interference and SINR conditions",
+          "Review scheduling algorithm and PRB assignments",
+          "Check UE capabilities and subscription limits"
+        ],
+        "severity": "minor"
+      },
+      {
+        "id": "R009",
+        "name": "Transport/Backhaul Packet Loss",
+        "description": "Detect transport layer packet loss that affects data throughput.",
+        "conditions": [
+          { "metric": "IpPacketLoss", "operator": ">", "value": "threshold_ip_loss" },
+          { "metric": "GigabitEthernetLink", "operator": "status", "value": "Faul" }
+        ],
+        "actions": [
+          "Check physical transport links, counters on ipaccesshostet/ipinterface/gigabitethernet",
+          "Review DSCP-to-Pbit mapping and QoS configuration (dscpPbitMap)",
+          "Coordinate with transport provider"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R010",
+        "name": "Throughput Lower Than Expected (UE / Server)",
+        "description": "Detect low throughput possibly caused by server, UE, or configuration.",
+        "conditions": [
+          { "metric": "ThroughputObserved", "operator": "<", "value": "ThroughputExpected" }
+        ],
+        "actions": [
+          "Run drive test or Iperf (use 1360 to avoid fragmentation) and FTP/UDP server checks",
+          "Verify UE PC/phone settings: MTU, TCP window, CPU/memory",
+          "Check scheduling activity metrics (pmSchedActivityCellUl, pmSchedActivityUeUl)",
+          "Confirm UE subscription and category in EPC/USIM"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R011",
+        "name": "Frequent eNodeB Restarts / Baseband Startup Issues",
+        "description": "Detect repeated restarts or baseband startup problems.",
+        "conditions": [
+          { "metric": "Alarm", "operator": "contains", "value": "Auto Restart" },
+          { "metric": "BasebandStartupFailures", "operator": ">", "value": 0 }
+        ],
+        "actions": [
+          "Perform complete eNB health check (MP, Baseband, RRU)",
+          "Collect baseband traces and enable relevant logs (bbmcBbOmMeSwU)",
+          "Check power supply and alarm history, verify software version"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R012",
+        "name": "Configuration Change / New Site Integration Check",
+        "description": "Flag potential issues after new site integration or config changes.",
+        "conditions": [
+          { "metric": "ConfigChangeTimestamp", "operator": "within", "value": "last_24h" },
+          { "metric": "AlarmCount", "operator": ">", "value": 0 }
+        ],
+        "actions": [
+          "Verify all parameters (RLC, timers tPeriodicBSR, PHRTimer, tTimeAlignmentTimer)",
+          "Validate cell reselection and DL power settings",
+          "Rollback or correct configuration if misconfiguration found"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R013",
+        "name": "Scheduling Performance Degradation",
+        "description": "Detect abnormal scheduling that can limit UL/DL throughput.",
+        "conditions": [
+          { "metric": "pmSchedActivityCellUl", "operator": "<", "value": "expected_activity" },
+          { "metric": "pmActiveDrbUlSum", "operator": "<", "value": "expected_active_drbs" }
+        ],
+        "actions": [
+          "Review scheduler configuration (Proportional Fair settings high/medium/low)",
+          "Check per-UE scheduling (pmSchedActivityUeUl) and resource allocations",
+          "Tune scheduling parameters and re-evaluate traffic patterns"
+        ],
+        "severity": "minor"
+      },
+      {
+        "id": "R014",
+        "name": "Coverage / Outdoor / Indoor Mismatch",
+        "description": "Detect potential coverage issues (poor RSSI, neighbor FEW).",
+        "conditions": [
+          { "metric": "partOfSectorPower_confOutputPower", "operator": "<", "value": "expected_power" },
+          { "metric": "pmRadioRecInterferencePwr", "operator": ">", "value": "threshold" }
+        ],
+        "actions": [
+          "Check antenna tilt/azimuth/height, consider mechanical adjustments",
+          "Review DL power parameters and crsGain/pdschTypeBGain",
+          "Consider adding small cell / pico / hetnet site if coverage hole"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R015",
+        "name": "UE Subscription / Capability Mismatch",
+        "description": "Detect issues caused by incorrect UE subscription or category settings.",
+        "conditions": [
+          { "metric": "UECategory", "operator": "not_in", "value": ["expected_categories"] },
+          { "metric": "SubscriptionDefinedInEPC", "operator": "=", "value": false }
+        ],
+        "actions": [
+          "Verify USIM and EPC subscription records",
+          "Correct subscription profile or update UE category if needed",
+          "Notify provisioning/OSS teams"
+        ],
+        "severity": "minor"
+      }
+    ],
+    "notes": {
+      "thresholds": {
+        "threshold_dl_pelr": "site-specific SLA (set by operator)",
+        "threshold_uu_pelr": "site-specific SLA (set by operator)",
+        "threshold_ip_loss": "operator-defined (e.g., 0.5%)",
+        "threshold_sinr": "-3 dB (example), tune per operator",
+        "threshold_mod_ratio": "operator-defined",
+        "expected_activity": "baseline measured per cell",
+        "expected_active_drbs": "baseline measured per cell"
+      },
+      "recommendation": "Map the placeholder thresholds to operator SLAs and baselines. Integrate with NMS/EMS to feed metric streams and alarm events. Use this JSON as input to a rules engine that supports logical operators, metric bindings and action workflows."
+    }
+  }
+}

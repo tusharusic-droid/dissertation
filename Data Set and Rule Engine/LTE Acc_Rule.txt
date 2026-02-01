@@ -1,0 +1,199 @@
+{
+  "engine": {
+    "name": "RAN_Troubleshooting_RuleEngine",
+    "version": "1.0",
+    "description": "Decision rules derived from provided document for RACH, RRC, Radio, Coverage, Capacity, Handover and License related issues. Each rule contains observable conditions (metrics/alarms) and recommended actions.",
+    "rules": [
+      {
+        "id": "R1",
+        "name": "RACH - High preamble collisions / low RACH success",
+        "category": "RACH",
+        "conditions": [
+          { "metric": "numberOfRAPreambles", "operator": "==", "value": "hardcoded_or_high" },
+          { "metric": "RACH_success_rate", "operator": "<", "value": 0.9 }
+        ],
+        "actions": [
+          "Improve RF conditions (tilt/azimuth/antenna height)",
+          "Check RSI planning (e.g. for 15km cell range ensure ~10dB difference with neighbors)",
+          "Tune RACH related parameters (preamble configuration, contention window, backoff)",
+          "Check for sleeping cell symptoms"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R2",
+        "name": "RRC connection establishment failures (general)",
+        "category": "RRC",
+        "conditions": [
+          { "metric": "pmRrcConnEstabAtt", "operator": "increasing", "value": "trend" },
+          { "metric": "pmRrcConnEstabSucc", "operator": "decreasing", "value": "trend" }
+        ],
+        "actions": [
+          "Check MP/load related counters (pmRrcConnEstabFailHighLoad, pmRrcConnEstabFailOverload)",
+          "Verify capacity (pmRrcConnMax, pmRrcConnLevSum)",
+          "Tune related parameters (tInactivityTimer, dlMaxRetxThreshold, ulMaxRetxThreshold)",
+          "Consider upgrade license if connected user limit reached"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R3",
+        "name": "RRC reattempts high (re-attempts)",
+        "category": "RRC",
+        "conditions": [
+          { "metric": "pmRrcConnEstabAttReatt", "operator": ">", "value": 0 },
+          { "metric": "pmRrcConnEstabSucc", "operator": "<", "value": 0.9 }
+        ],
+        "actions": [
+          "Analyze failure cause (radio procedure failure vs core)",
+          "Tune RACH/RRC timers and backoff parameters",
+          "Check for radio coverage and interference issues"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R4",
+        "name": "Capacity overload causing RRC failures / high active user",
+        "category": "Capacity",
+        "conditions": [
+          { "metric": "pmActiveUeDlSum", "operator": ">", "value": "threshold_per_site" },
+          { "metric": "pmRrcConnEstabFailActiveUserLicenseExceeded", "operator": "==", "value": true }
+        ],
+        "actions": [
+          "Check and tune scheduling parameters (SchedulingAlgorithm, pdcchCfiMode, noOfPucchCqiUsers)",
+          "Tune tInactivityTimer, dlMaxRetxThreshold, ulMaxRetxThreshold",
+          "Offload using cell reselection / Handover minimization",
+          "Check license limits and consider license upgrade",
+          "Consider physical optimizations (tilt/azimuth/antenna height)"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R5",
+        "name": "Poor DL SINR / Radio poor performance",
+        "category": "Radio",
+        "conditions": [
+          { "metric": "pmRadioUeRepCqiDistr", "operator": "skewed_low", "value": true },
+          { "metric": "pmRrcConnEstabFailFailureInRadioProcedure", "operator": "==", "value": true }
+        ],
+        "actions": [
+          "Verify maximumTransmissionPower and partOfSectorPowerconfOutputPower",
+          "Tune crsGain, pdschTypeBGain and related radio parameters",
+          "Perform physical optimization (tilt/azimuth/antenna height)",
+          "Identify and mitigate DL interference and overshooting cells"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R6",
+        "name": "Coverage issues detected",
+        "category": "Coverage",
+        "conditions": [
+          { "metric": "pmBadCovEvalReport", "operator": ">", "value": 0 },
+          { "metric": "pmBadCovSearchEvalReport", "operator": ">", "value": 0 }
+        ],
+        "actions": [
+          "Tune DL power related parameters (maximumTransmissionPower, partOfSectorPowerconfOutputPower)",
+          "Check crsGain and related settings",
+          "Perform physical changes (tilt/azimuth/height) or add small cells (PICO/DOT/HetNet)",
+          "Audit and tune cell reselection parameters"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R7",
+        "name": "Indoor coverage weak",
+        "category": "Coverage",
+        "conditions": [
+          { "metric": "indoor_user_reports", "operator": "high", "value": true },
+          { "metric": "pmBadCovEvalReport", "operator": ">", "value": 0 }
+        ],
+        "actions": [
+          "Deploy / optimize small cell (PICO/DOT/HetNet)",
+          "Adjust antenna tilt/azimuth/height and DL power",
+          "Audit reselection parameters to allow indoor cells to serve users"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R8",
+        "name": "Handover / Mobility optimization required",
+        "category": "Mobility",
+        "conditions": [
+          { "metric": "excessive_handover_failures", "operator": "true", "value": true },
+          { "metric": "imbalance_traffic_between_cells", "operator": "true", "value": true }
+        ],
+        "actions": [
+          "Tune cell reselection parameters to offload to nearby cells",
+          "Use automated mobility optimization and handover minimization",
+          "Adjust qOffsetcellEUtran, qRxLevMin and related thresholds"
+        ],
+        "severity": "medium"
+      },
+      {
+        "id": "R9",
+        "name": "License limits reached",
+        "category": "License",
+        "conditions": [
+          { "metric": "pmLicConnectedUsersActual", "operator": ">=", "value": "pmLicConnectedUsersHardLimit" },
+          { "metric": "pmRrcConnEstabFailLic", "operator": "==", "value": true }
+        ],
+        "actions": [
+          "Evaluate and procure required license to increase connected user capacity",
+          "Temporarily tune scheduling and inactivity timers to relieve load",
+          "Monitor pmLicConnectedUsersTimeCong and distribution"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R10",
+        "name": "Interface / hardware alarm on node (links down / faulty boards / TMA)",
+        "category": "Alarms & Hardware",
+        "conditions": [
+          { "metric": "history_alarms", "operator": "contains", "value": ["RRU_down", "S1_link_down", "interface_board_fault", "TMA_fault"] }
+        ],
+        "actions": [
+          "Check RRU status and reset boards if required",
+          "Verify software on node and board-level firmware",
+          "Verify VSWR on all antenna TMA ports and check TMA connections and settings",
+          "Take necessary action according to alarm type (replace board, repair connection, escalate)"
+        ],
+        "severity": "critical"
+      },
+      {
+        "id": "R11",
+        "name": "Excessive retransmissions",
+        "category": "Radio",
+        "conditions": [
+          { "metric": "dl_retx_rate", "operator": ">", "value": "dlMaxRetxThreshold" },
+          { "metric": "ul_retx_rate", "operator": ">", "value": "ulMaxRetxThreshold" }
+        ],
+        "actions": [
+          "Tune dlMaxRetxThreshold and ulMaxRetxThreshold",
+          "Check CQI distribution and PDSCH parameters",
+          "Improve RF conditions and reduce interference"
+        ],
+        "severity": "major"
+      },
+      {
+        "id": "R12",
+        "name": "Identify overshooting neighbor causing DL interference",
+        "category": "Interference",
+        "conditions": [
+          { "metric": "neighbor_interference_reports", "operator": "high", "value": true },
+          { "metric": "poor_DL_SINR_in_sector", "operator": "true", "value": true }
+        ],
+        "actions": [
+          "Identify overshooting cells and adjust parameters or tilt/azimuth",
+          "Reduce DL power if appropriate and adjust cell boundary parameters",
+          "Audit neighbor and reselection parameters"
+        ],
+        "severity": "major"
+      }
+    ],
+    "notes": {
+      "metric_mapping_hint": "Replace placeholder metric names and thresholds (e.g., 'threshold_per_site', 'dlMaxRetxThreshold') with actual network KPIs and configured thresholds before deployment.",
+      "interpretation_hint": "Some conditions use qualitative trends (increasing/decreasing). Implement time-series checks or trend detection in the rules engine for those."
+    }
+  }
+}

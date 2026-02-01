@@ -1,0 +1,247 @@
+{
+  "ruleEngineVersion": "1.0",
+  "description": "Rule engine for RAN troubleshooting and remediation derived from provided document. Each rule contains conditions (counters, alarms, or states), evaluation logic and recommended actions.",
+  "rules": [
+    {
+      "id": "R001",
+      "name": "Handover Preparation Rejection - License Capacity",
+      "category": "Mobility / License",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmHoPrepRejInLicConnUsers", "operator": ">", "value": 0 },
+        { "state": "licenseState", "operator": "==", "value": "active" },
+        { "metric": "licenseCapacityConnectedUsers", "operator": "<=", "value": "currentConnectedUsers" }
+      ],
+      "actions": [
+        "Audit licenseState, featurestate and servicestate for target cell",
+        "Check licenseCapacityConnectedUsers and gracePeriodTimeLeft",
+        "If capacity limit reached: offload traffic from target cell (layering strategy, idle/connected reselection, load balancing)",
+        "Consider capacity upgrade or license increase"
+      ]
+    },
+    {
+      "id": "R002",
+      "name": "Handover Preparation Rejection - Mobility Feature/Config",
+      "category": "Mobility / Config",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmHoPrepRejInLicMob", "operator": ">", "value": 0 },
+        { "metric": "pmHoPrepRejInLicMultiErab", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Audit feature and service states for Intra/Inter-frequency HO and MultiErabsPerUser",
+        "Verify mobility related parameters and cell relations (EUtranCellRelation, TermPointToENB, TermPointToMme)",
+        "Reduce unnecessary HOs via UE-level oscillating HO minimization and Automated Mobility Optimization"
+      ]
+    },
+    {
+      "id": "R003",
+      "name": "Handover Preparation Rejection - RLC UM",
+      "category": "Mobility / RLC",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmHoPrepRejInLicRlcUm", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Audit RlcUm feature parameters and service state",
+        "Check related configuration and supported features on source and target cells",
+        "Validate UE capabilities and RLC settings"
+      ]
+    },
+    {
+      "id": "R004",
+      "name": "Handover Preparation Rejection - Load/Capacity",
+      "category": "Load / Capacity",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmHoPrepRejInHighLoad", "operator": ">", "value": 0 },
+        { "metric": "pmHoPrepRejInOverload", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Check target cell load and DUS/DUL MP capacity differences",
+        "Offload traffic by changing antenna tilt/azimuth/height, layering strategy or load balancing parameters",
+        "Reduce HO attempts to overloaded target cell and optimize admission control"
+      ]
+    },
+    {
+      "id": "R005",
+      "name": "Admission Rejects - Transport or RRC Limits",
+      "category": "Admission Control",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmHoPrepRejInBearerAdmissionRej", "operator": ">", "value": 0 },
+        { "any": [
+            { "metric": "dlTransNwBandwidth", "operator": "<", "value": "required" },
+            { "metric": "ulTransNwBandwidth", "operator": "<", "value": "required" },
+            { "metric": "pmRrcConnMax", "operator": "<=", "value": "pmRrcConnLevSum" }
+        ]}
+      ],
+      "actions": [
+        "Audit UE admission control, SRB/DRB admission, transport network admission control",
+        "Prioritize emergency calls where needed",
+        "Tune RRC connection limits or upgrade transport bandwidth"
+      ]
+    },
+    {
+      "id": "R006",
+      "name": "Cell Down / Availability",
+      "category": "Availability",
+      "severity": "critical",
+      "conditions": [
+        { "alarm": "AutoPmCellDown", "operator": "==", "value": true },
+        { "alarm": "AutoPmCellDowntime", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Verify recent configuration changes for the site (ActivePlmnList, PCI, TAC, EutranFrequencyRef, TermPoint IP addresses)",
+        "Check eNodeB process and baseband health; perform auto-restart if necessary",
+        "Collect baseband traces and check for Baseband Startup issues",
+        "Check S1 and transport alarms (ServiceUnavailable, Gigabit Ethernet Link Fault)"
+      ]
+    },
+    {
+      "id": "R007",
+      "name": "S1 / Transport Failure Affecting ERAB",
+      "category": "Transport / S1",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmErabRelAbnormalEnbActTnFail", "operator": ">", "value": 0 },
+        { "alarm": "ServiceUnavailable(S1)", "operator": "==", "value": true }
+      ],
+      "actions": [
+        "Check transport connectivity and S1-MME / S1-U links",
+        "Inspect transport interface configuration and Ethernet link status",
+        "Collect relevant logs and alarms; escalate to core transport team"
+      ]
+    },
+    {
+      "id": "R008",
+      "name": "ERAB Release - Handover Preparation Failure",
+      "category": "ERAB / Handover",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmErabRelAbnormalEnbActHpr", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Check alarms and logs for Handover Preparation failures",
+        "Inspect mobility configuration, cell relations and admission control",
+        "Consider tuning mobility parameters and reducing handover rate to target cell"
+      ]
+    },
+    {
+      "id": "R009",
+      "name": "UL Interference / Poor UL SINR",
+      "category": "Interference / RF",
+      "severity": "major",
+      "conditions": [
+        { "metric": "pmRadioRecInterferencePwrPucch", "operator": ">", "value": "threshold" },
+        { "metric": "pmRadioRecInterferencePwrPrb1~100", "operator": ">", "value": "threshold" },
+        { "metric": "pmSinrPucchDistr", "operator": "<", "value": "threshold" },
+        { "metric": "pmSinrPuschDistr", "operator": "<", "value": "threshold" }
+      ],
+      "actions": [
+        "Check UL power control parameters; enable or tune IRC and UL FSS features",
+        "Inspect RF hardware: antenna connectors, VSWR, TMA connections, faulty antenna ports",
+        "Investigate external interference sources (cable TV, repeaters, airport/police comms)",
+        "Run drive test or spectrum scan if needed"
+      ]
+    },
+    {
+      "id": "R010",
+      "name": "VSWR or RF Hardware Alarm",
+      "category": "Hardware / RF",
+      "severity": "critical",
+      "conditions": [
+        { "alarm": "VswrOverThreshold", "operator": "==", "value": true },
+        { "any": [
+            { "alarm": "TxAntennaFault", "operator": "==", "value": true },
+            { "alarm": "RxAntennaFault", "operator": "==", "value": true },
+            { "alarm": "DUSBoardError", "operator": "==", "value": true }
+        ]}
+      ],
+      "actions": [
+        "Inspect physical cabling and connectors immediately",
+        "Replace or repair faulty antenna / RF components",
+        "Schedule on-site hardware maintenance"
+      ]
+    },
+    {
+      "id": "R011",
+      "name": "Cell Barred / Operation Issue",
+      "category": "Operation",
+      "severity": "major",
+      "conditions": [
+        { "parameter": "CellBarred", "operator": "==", "value": true },
+        { "parameter": "acBarring", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Check if cell has been intentionally barred (maintenance/traffic engineering)",
+        "If unintended, remove barring and verify service restoration",
+        "Review coverage planning and idle/connected reselection parameters"
+      ]
+    },
+    {
+      "id": "R012",
+      "name": "Configuration Mismatch After Integration",
+      "category": "Config",
+      "severity": "major",
+      "conditions": [
+        { "event": "newSiteIntegrated", "operator": "==", "value": true },
+        { "any": [
+            { "parameter": "ActivePlmnList", "operator": "mismatch", "value": "expected" },
+            { "parameter": "EutranFrequencyRef", "operator": "mismatch", "value": "expected" },
+            { "parameter": "TermPointToENB.IP", "operator": "mismatch", "value": "expected" }
+        ]}
+      ],
+      "actions": [
+        "Validate MO parameters: ExternalEUtranCellTDD, EUtranCellRelation, TermPointToENB, TermPointToMme",
+        "Correct configuration mismatches and re-test cell availability",
+        "Perform a full eNB health check after fixes"
+      ]
+    },
+    {
+      "id": "R013",
+      "name": "Baseband Startup / Software Issues",
+      "category": "Software / Baseband",
+      "severity": "major",
+      "conditions": [
+        { "alarm": "BasebandStartupFailure", "operator": "==", "value": true },
+        { "metric": "basebandRestartCount", "operator": ">", "value": 0 }
+      ],
+      "actions": [
+        "Collect baseband trace and logs (bbmcBbOmMeSwU etc.)",
+        "Follow vendor procedures to restart baseband or eNodeB safely",
+        "Coordinate with vendor support if persistent"
+      ]
+    },
+    {
+      "id": "R014",
+      "name": "Transport Bandwidth Insufficient for Bearer Admission",
+      "category": "Transport / BW",
+      "severity": "major",
+      "conditions": [
+        { "metric": "dlTransNwBandwidth", "operator": "<", "value": "bearerDemand" },
+        { "metric": "ulTransNwBandwidth", "operator": "<", "value": "bearerDemand" }
+      ],
+      "actions": [
+        "Audit transport capacity and QoS mapping",
+        "Increase transport bandwidth or reassign Bearer admission priorities",
+        "Consider traffic shaping or admission control adjustments"
+      ]
+    },
+    {
+      "id": "R015",
+      "name": "General Alarm Monitor & Escalation",
+      "category": "Monitoring",
+      "severity": "minor",
+      "conditions": [
+        { "alarmList": ["ServiceUnavailable(S1)", "GigabitEthernetLinkFault", "AutoPmCellDown", "VswrOverThreshold"], "operator": "any" }
+      ],
+      "actions": [
+        "Log and notify operations team for immediate action",
+        "Correlate alarms with KPIs and recent configuration changes",
+        "If multiple critical alarms present, trigger full eNB health check and vendor escalation"
+      ]
+    }
+  ],
+  "notes": "Threshold placeholders like 'threshold', 'required', 'expected', or 'currentConnectedUsers' should be replaced with operator-specific numeric thresholds or references. This JSON is a rule template derived from the supplied document and should be integrated into a rules engine that evaluates metrics, alarms and states from the network management system."
+}

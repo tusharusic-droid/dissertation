@@ -1,0 +1,347 @@
+{
+  "ruleEngineVersion": "1.0",
+  "description": "Rule engine for diagnosing and remediating cellular mobility, handover, admission, coverage and HW/SW issues based on provided checklist.",
+  "rules": [
+    {
+      "id": "R01",
+      "name": "HO Preparation Rejection - License/Feature Limit",
+      "symptoms": [
+        "pmHoPrepRejInLicMob",
+        "pmHoPrepRejInLicMultiErab",
+        "pmHoPrepRejInLicRlcUm",
+        "pmHoPrepRejInLicConnUserscapacityUnitConnectedUsers"
+      ],
+      "conditions": [
+        {
+          "type": "counter",
+          "key": "pmHoPrepRejInLicMob",
+          "operator": ">",
+          "value": 0
+        },
+        {
+          "type": "counter",
+          "key": "pmHoPrepRejInLicMultiErab",
+          "operator": ">",
+          "value": 0,
+          "matchAny": true
+        }
+      ],
+      "checks": [
+        "Audit licenseState, featureState, serviceState",
+        "Check 'licenseCapacityConnectedUsers' and GracePeriodTimeLeft",
+        "Verify MultiErabsPerUser and RlcUm feature licensing"
+      ],
+      "actions": [
+        "If license exceeded and GracePeriod expired: Offload traffic from target cell (change tilt/azimuth/antenna height, adjust layering strategy, idle mode cell reselection or connected mode mobility parameters).",
+        "If temporary grace allows: monitor and avoid sustained overload.",
+        "If licensing missing: request license or enable feature per policy."
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "R02",
+      "name": "HO Preparation Rejection - Admission Control / Bandwidth",
+      "symptoms": [
+        "pmHoPrepRejInBearerAdmissionRejdlTransNwBandwidth",
+        "pmHoPrepRejInBearerAdmissionRejulTransNwBandwidth",
+        "pmRrcConnMax",
+        "pmRrcConnLevSum"
+      ],
+      "conditions": [
+        {
+          "type": "counter",
+          "key": "pmHoPrepRejInBearerAdmissionRejdlTransNwBandwidth",
+          "operator": ">",
+          "value": 0
+        }
+      ],
+      "checks": [
+        "Audit UE Admission Control, Bearer Admission Control (SRB & DRB)",
+        "Check Transport Network Admission Control settings and emergency call prioritization",
+        "Review admission control and transport bandwidth parameters on target cell"
+      ],
+      "actions": [
+        "Tune admission control and bearer admission parameters to allow needed handovers.",
+        "Offload traffic from target cell (physical tilt/azimuth/antenna height changes or layering strategy changes).",
+        "Ensure network transport capacity is provisioned or reroute traffic if required."
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "R03",
+      "name": "Handover Execution Failure - RRC/Execution Counters",
+      "symptoms": [
+        "pmHoExeAtt",
+        "pmHoExeSucc",
+        "pmHoExeAttLTEIntraF",
+        "pmHoExeSuccLTEIntraF",
+        "pmHoExeAttLTEInterF",
+        "pmHoExeSuccLTEInterF"
+      ],
+      "conditions": [
+        {
+          "type": "counter_ratio",
+          "numerator": "pmHoExeSucc",
+          "denominator": "pmHoExeAtt",
+          "operator": "<",
+          "value": 0.9
+        }
+      ],
+      "checks": [
+        "Verify S1 connectivity and related alarms (ServiceUnavailable, S1 connection failure)",
+        "Check MME pool consistency between source and target (use get.termpointmme or equivalent)",
+        "Audit neighbor/co-sited PCI conflicts and overshooting cells",
+        "Check handover-related thresholds and timers (b2Threshold*, a2ThresholdRsrpPrim, a5B2MobilityTimer, hysteresis, timeToTrigger)"
+      ],
+      "actions": [
+        "If MME pool mismatch: update configuration to use correct MME pool or adjust MME routing.",
+        "Resolve S1 link and interface board faults (reset/replace boards, reconcile SW).",
+        "Adjust handover thresholds/hysteresis/timeToTrigger to reduce false/failed handovers.",
+        "Audit and correct neighbor relations (ExternalEutranCellFDD, EUtranCellRelation)."
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "R04",
+      "name": "Cell Down / Availability",
+      "symptoms": [
+        "Cell Down",
+        "pmCellDowntimeAuto",
+        "pmCellDownLockAuto"
+      ],
+      "conditions": [
+        {
+          "type": "alarm",
+          "key": "CellDown",
+          "state": "active"
+        }
+      ],
+      "checks": [
+        "Check eNodeB configuration and recent changes",
+        "Perform complete eNB health check (BBU, RRU, DUS, MP)",
+        "Check SW version consistency on node and restart logs",
+        "Check S1 link status and related alarms"
+      ],
+      "actions": [
+        "If configuration issue after new site integration: correct MO parameters (ExternalEUtranCellFDD, TermPointToENB, TermPointToMme, ActivePLMNList, PCI, TAC, EutranFrequencyRef, IP settings).",
+        "Reboot or perform controlled restart of impacted boards (BBU/DUS) if safe and approved.",
+        "Open hardware ticket if baseband or RRU faults persist."
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "R05",
+      "name": "Coverage Issues / Bad Coverage Evaluations",
+      "symptoms": [
+        "pmBadCovEvalReport",
+        "pmBadCovSearchEvalReport",
+        "pmRadioTbsPwrRestricted"
+      ],
+      "conditions": [
+        {
+          "type": "counter",
+          "key": "pmBadCovEvalReport",
+          "operator": ">",
+          "value": 0
+        }
+      ],
+      "checks": [
+        "Verify target cell coverage (drive test or RF maps)",
+        "Check maximumTransmissionPower, outputPower, partOfSectorPower, crsGain, pdschTypeBGain, Indoor coverage parameters",
+        "Check for overshooting neighbors and wrong neighbor entries"
+      ],
+      "actions": [
+        "If under-covered: change tilt/azimuth/antenna height or add capacity sites/mini cells.",
+        "Tune output power and antenna parameters to improve coverage area.",
+        "Correct neighbor configuration entries that may cause wrong reselection/handover."
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "R06",
+      "name": "High Uplink Interference",
+      "symptoms": [
+        "High UL interference indicators",
+        "elevated UL noise floor or degraded UL SINR"
+      ],
+      "conditions": [
+        {
+          "type": "measurement",
+          "key": "UL_interference_level",
+          "operator": ">",
+          "value": "threshold" 
+        }
+      ],
+      "checks": [
+        "Inspect UL interference sources and perform spectrum analysis",
+        "Check wrong neighbor or misconfigured UL power settings",
+        "Check hardware (alarms, cabling, connectors, VSWR)"
+      ],
+      "actions": [
+        "Mitigate interference (identify source and apply filters/changes, adjust neighbor configs).",
+        "Tune UL power control and admission settings.",
+        "Replace faulty cabling or antenna elements where VSWR or connectors are bad."
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "R07",
+      "name": "PCI Conflict or Confusion",
+      "symptoms": [
+        "Unexpected HO failures",
+        "Neighbor confusion",
+        "PCI collision alarms"
+      ],
+      "conditions": [
+        {
+          "type": "config_check",
+          "key": "PCI",
+          "operator": "conflict_with_nearby",
+          "value": true
+        }
+      ],
+      "checks": [
+        "Audit PCI of nearby sites",
+        "Check for overshooting cells causing PCI confusion",
+        "Ensure OSS PCI planning is consistent"
+      ],
+      "actions": [
+        "Reassign PCI to avoid conflict or adjust transmit parameters to eliminate overshoot overlap.",
+        "Correct neighbor lists and re-scan for detection problems."
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "R08",
+      "name": "S1 Link Down / Interface Board Fault",
+      "symptoms": [
+        "ServiceUnavailable",
+        "S1 connection failure",
+        "GigabitEthernet Link Fault",
+        "GeneralHwError"
+      ],
+      "conditions": [
+        {
+          "type": "alarm",
+          "key": "S1LinkDown",
+          "state": "active"
+        }
+      ],
+      "checks": [
+        "Verify physical interfaces and cabling",
+        "Check interface board health and logs",
+        "Confirm SW package integrity and version"
+      ],
+      "actions": [
+        "Reset or swap faulty interface board if available.",
+        "Verify and reload valid SW package if corruption suspected.",
+        "Restore S1 connectivity and verify MME reachability."
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "R09",
+      "name": "Configuration Issue after New Site Integration",
+      "symptoms": [
+        "Multiple alarms shortly after site integration",
+        "HO or S1 failures localized to new site"
+      ],
+      "conditions": [
+        {
+          "type": "event",
+          "key": "siteIntegration",
+          "operator": "recent"
+        }
+      ],
+      "checks": [
+        "Validate MO parameters: ExternalEUtranCellFDD, EUtranCellRelation, TermPointToENB, TermPointToMme",
+        "Check ActivePLMNList, PCI, TAC, EutranFrequencyRef, TermPointToENB & MME IP addresses"
+      ],
+      "actions": [
+        "Correct misconfigurations found; rollback recent changes if necessary.",
+        "Perform integration acceptance tests and re-run health checks."
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "R10",
+      "name": "Hardware Board Errors (DUS, MP, Baseband)",
+      "symptoms": [
+        "DUS Board error",
+        "MP Baseband alarms",
+        "High hardware fault counters"
+      ],
+      "conditions": [
+        {
+          "type": "alarm",
+          "key": "BoardError",
+          "operator": "exists",
+          "value": ["DUS", "MP", "Baseband"]
+        }
+      ],
+      "checks": [
+        "Verify board error logs, temps, and power supplies",
+        "Check cabling and connectors for damage",
+        "Confirm SW compatibility with HW"
+      ],
+      "actions": [
+        "Reset or replace faulty boards as per maintenance policy.",
+        "If recurring, escalate RMA and open hardware ticket."
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "R11",
+      "name": "SW Package Corruption",
+      "symptoms": [
+        "Repeated SW package installation failures",
+        "Inconsistent node behavior after upgrade"
+      ],
+      "conditions": [
+        {
+          "type": "log_indicator",
+          "key": "sw_package_error",
+          "operator": "exists"
+        }
+      ],
+      "checks": [
+        "Verify SW package checksum and integrity",
+        "Confirm version compatibility with node hardware"
+      ],
+      "actions": [
+        "Replace corrupt package with verified package and retry upgrade.",
+        "If failure persists, rollback to previous stable SW and escalate."
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "R12",
+      "name": "Neighbor Relation / Wrong Neighbor Config",
+      "symptoms": [
+        "HO failures to specific neighbor",
+        "Unexpected reselection or interference"
+      ],
+      "conditions": [
+        {
+          "type": "config_mismatch",
+          "key": "ExternalUtranCell or ExternalEutranCell",
+          "operator": "invalid_or_missing"
+        }
+      ],
+      "checks": [
+        "Audit neighbor configuration entries (ExternalUtranCell, ExternalEutranCell, EUtranCellRelation)",
+        "Validate frequency relations (UtranFreqRelation)"
+      ],
+      "actions": [
+        "Correct neighbor entries and frequency relations.",
+        "Validate OSS neighbor provisioning and run neighbor consistency checks."
+      ],
+      "priority": "medium"
+    }
+  ],
+  "notes": [
+    "Threshold values marked as 'threshold' should be parameterized per operator SLAs and local KPI baselines.",
+    "Actions such as changing tilt/azimuth/antenna height require field work orders and safety approvals.",
+    "This engine is intended to guide troubleshooting; final corrective actions should consider operator change control and impact analysis."
+  ]
+}
